@@ -1,0 +1,10 @@
+Package: com.skyglow.mapsx
+Name: MapsX
+Version: 1.0
+Architecture: iphoneos-arm
+Description: This tweak fixes Apple Maps and any MapView in the system (asking Siri for location...) by redirecting various dead URL's, this only works because Apple decided to lift their tile server restriction, so enjoy it will it lasts (Currently hybrid nor satellite view works) PLEASE REBOOT AFTER INSTALLING
+Maintainer: Requis
+Author: Requis
+Section: Tweaks
+Depends: mobilesubstrate (>= 0.9.5000)
+Depiction: http://cydia.skyglow.es/depictions/?p=com.skyglow.mapsx
