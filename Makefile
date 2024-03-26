@@ -9,5 +9,5 @@ TWEAK_NAME = MapsX
 
 MapsX_FILES = Tweak.x
 MapsX_CFLAGS = -fobjc-arc
-MapsX_Tweak_PRIVATEFRAMEWORKS = GeoServices
+
 include $(THEOS_MAKE_PATH)/tweak.mk
