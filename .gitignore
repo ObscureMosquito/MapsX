@@ -1,3 +1,4 @@
+.gitignore
 .theos/
 packages/
 .DS_Store
