@@ -14,4 +14,7 @@ Simple Cydia Tweak that will fix any Apple MapView instance in the system for io
 https://cydia.skyglow.es
 ```
 
-#### Then reboot your device
+
+### To run MapsX, make sure:
+
+- Reboot device after installation
