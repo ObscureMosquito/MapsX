@@ -4,7 +4,7 @@
 
 NSString *customURLEncode(NSString *string);
 NSString *customURLDecode(NSString *string);
-@interface QueryToLatLng : NSObject
+@interface GEOQueryToLatLng : NSObject
 
 +(NSError*)getQueryToLatLng:(NSString*)query region:(GEOMapRegion*)currentMapRegion out:(GEOWaypointID*)output;
 

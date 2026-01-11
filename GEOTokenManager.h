@@ -1,6 +1,6 @@
 #import <Foundation/Foundation.h>
 
-@interface TokenManager : NSObject
+@interface GEOTokenManager : NSObject
 
 + (instancetype)sharedManager;
 - (NSString *)currentAccessKey;

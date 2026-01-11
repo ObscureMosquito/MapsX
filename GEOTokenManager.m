@@ -1,19 +1,19 @@
 #import <Foundation/Foundation.h>
 #include <Foundation/NSString.h>
 #import <CoreFoundation/CoreFoundation.h>
-#import "TokenManager.h"
+#import "GEOTokenManager.h"
 
-@interface TokenManager ()
+@interface GEOTokenManager ()
 @property (nonatomic, strong) NSString *accessKey;
 @property (nonatomic, strong) NSString *accessToken;
 @property (nonatomic, assign) NSTimeInterval expiresAt;
 @property (nonatomic, strong) NSOperationQueue *tokenOperationQueue;
 @end
 
-@implementation TokenManager
+@implementation GEOTokenManager
 
 + (instancetype)sharedManager {
-    static TokenManager *sharedManager = nil;
+    static GEOTokenManager *sharedManager = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         sharedManager = [[self alloc] init];

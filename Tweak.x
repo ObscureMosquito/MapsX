@@ -1,148 +1,17 @@
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
-#import "TokenManager.h"
+#import "GEOTokenManager.h"
 #import <execinfo.h>
 #import "Protobufs.h"
 #import "GeoHeaders.h"
-#import "QueryToLatLng.h"
-
-void logGEOPlaceSearchRequestDetails(GEOPlaceSearchRequest *request) {
-    if (!request) {
-        NSLog(@"[MapsX] GEOPlaceSearchRequest is nil");
-        return;
-    }
-    
-    NSLog(@"[MapsX] ----- GEOPlaceSearchRequest Details -----");
-    
-    // Log primitive values
-    NSLog(@"[MapsX] geoId: %lld", [request valueForKey:@"_geoId"] ? [[request valueForKey:@"_geoId"] longLongValue] : 0);
-    NSLog(@"[MapsX] intersectingGeoId: %llu", [request valueForKey:@"_intersectingGeoId"] ? [[request valueForKey:@"_intersectingGeoId"] unsignedLongLongValue] : 0);
-    NSLog(@"[MapsX] timestamp: %f", [request valueForKey:@"_timestamp"] ? [[request valueForKey:@"_timestamp"] doubleValue] : 0.0);
-    NSLog(@"[MapsX] businessSortOrder: %d", [request valueForKey:@"_businessSortOrder"] ? [[request valueForKey:@"_businessSortOrder"] intValue] : 0);
-    NSLog(@"[MapsX] localSearchProviderID: %d", [request valueForKey:@"_localSearchProviderID"] ? [[request valueForKey:@"_localSearchProviderID"] intValue] : 0);
-    NSLog(@"[MapsX] maxBusinessReviews: %d", [request valueForKey:@"_maxBusinessReviews"] ? [[request valueForKey:@"_maxBusinessReviews"] intValue] : 0);
-    NSLog(@"[MapsX] maxResults: %d", [request valueForKey:@"_maxResults"] ? [[request valueForKey:@"_maxResults"] intValue] : 0);
-    NSLog(@"[MapsX] resultOffset: %d", [request valueForKey:@"_resultOffset"] ? [[request valueForKey:@"_resultOffset"] intValue] : 0);
-    NSLog(@"[MapsX] sequenceNumber: %d", [request valueForKey:@"_sequenceNumber"] ? [[request valueForKey:@"_sequenceNumber"] intValue] : 0);
-    NSLog(@"[MapsX] sessionID: %d", [request valueForKey:@"_sessionID"] ? [[request valueForKey:@"_sessionID"] intValue] : 0);
-    
-    // Log BOOL values
-    NSLog(@"[MapsX] allowABTestResponse: %d", [request valueForKey:@"_allowABTestResponse"] ? [[request valueForKey:@"_allowABTestResponse"] boolValue] : NO);
-    NSLog(@"[MapsX] excludeAddressInResults: %d", [request valueForKey:@"_excludeAddressInResults"] ? [[request valueForKey:@"_excludeAddressInResults"] boolValue] : NO);
-    NSLog(@"[MapsX] includeBusinessCategories: %d", [request valueForKey:@"_includeBusinessCategories"] ? [[request valueForKey:@"_includeBusinessCategories"] boolValue] : NO);
-    NSLog(@"[MapsX] includeBusinessRating: %d", [request valueForKey:@"_includeBusinessRating"] ? [[request valueForKey:@"_includeBusinessRating"] boolValue] : NO);
-    NSLog(@"[MapsX] includeEntryPoints: %d", [request valueForKey:@"_includeEntryPoints"] ? [[request valueForKey:@"_includeEntryPoints"] boolValue] : NO);
-    NSLog(@"[MapsX] includeFeatureSets: %d", [request valueForKey:@"_includeFeatureSets"] ? [[request valueForKey:@"_includeFeatureSets"] boolValue] : NO);
-    NSLog(@"[MapsX] includeGeoId: %d", [request valueForKey:@"_includeGeoId"] ? [[request valueForKey:@"_includeGeoId"] boolValue] : NO);
-    NSLog(@"[MapsX] includePhonetics: %d", [request valueForKey:@"_includePhonetics"] ? [[request valueForKey:@"_includePhonetics"] boolValue] : NO);
-    NSLog(@"[MapsX] includeQuads: %d", [request valueForKey:@"_includeQuads"] ? [[request valueForKey:@"_includeQuads"] boolValue] : NO);
-    NSLog(@"[MapsX] includeStatusCodeInfo: %d", [request valueForKey:@"_includeStatusCodeInfo"] ? [[request valueForKey:@"_includeStatusCodeInfo"] boolValue] : NO);
-    NSLog(@"[MapsX] includeSuggestionsOnly: %d", [request valueForKey:@"_includeSuggestionsOnly"] ? [[request valueForKey:@"_includeSuggestionsOnly"] boolValue] : NO);
-    NSLog(@"[MapsX] includeUnmatchedStrings: %d", [request valueForKey:@"_includeUnmatchedStrings"] ? [[request valueForKey:@"_includeUnmatchedStrings"] boolValue] : NO);
-    NSLog(@"[MapsX] isStrictMapRegion: %d", [request valueForKey:@"_isStrictMapRegion"] ? [[request valueForKey:@"_isStrictMapRegion"] boolValue] : NO);
-    NSLog(@"[MapsX] structuredSearch: %d", [request valueForKey:@"_structuredSearch"] ? [[request valueForKey:@"_structuredSearch"] boolValue] : NO);
-    
-    // Log string values
-    NSLog(@"[MapsX] deviceCountryCode: %@", [request valueForKey:@"_deviceCountryCode"]);
-    NSLog(@"[MapsX] inputLanguage: %@", [request valueForKey:@"_inputLanguage"]);
-    NSLog(@"[MapsX] phoneticLocaleIdentifier: %@", [request valueForKey:@"_phoneticLocaleIdentifier"]);
-    NSLog(@"[MapsX] search: %@", [request valueForKey:@"_search"]);
-    NSLog(@"[MapsX] searchContext: %@", [request valueForKey:@"_searchContext"]);
-    NSLog(@"[MapsX] suggestionsPrefix: %@", [request valueForKey:@"_suggestionsPrefix"]);
-    
-    // Log complex objects
-    GEOAddress *address = [request valueForKey:@"_address"];
-    if (address) {
-        NSLog(@"[MapsX] address: %@", [address description]);
-        
-        NSArray *formattedAddressLines = [address valueForKey:@"_formattedAddressLines"];
-        if (formattedAddressLines && [formattedAddressLines count] > 0) {
-            NSLog(@"[MapsX] address formattedAddressLines: %@", formattedAddressLines);
-        }
-        
-        GEOStructuredAddress *structuredAddress = [address valueForKey:@"_structuredAddress"];
-        if (structuredAddress) {
-            NSLog(@"[MapsX] structuredAddress: %@", structuredAddress);
-            NSLog(@"[MapsX] country: %@", [structuredAddress valueForKey:@"_country"]);
-            NSLog(@"[MapsX] countryCode: %@", [structuredAddress valueForKey:@"_countryCode"]);
-            NSLog(@"[MapsX] administrativeArea: %@", [structuredAddress valueForKey:@"_administrativeArea"]);
-            NSLog(@"[MapsX] locality: %@", [structuredAddress valueForKey:@"_locality"]);
-            NSLog(@"[MapsX] thoroughfare: %@", [structuredAddress valueForKey:@"_thoroughfare"]);
-            NSLog(@"[MapsX] subThoroughfare: %@", [structuredAddress valueForKey:@"_subThoroughfare"]);
-            NSLog(@"[MapsX] postCode: %@", [structuredAddress valueForKey:@"_postCode"]);
-        }
-    }
-    
-    GEOLatLng *deviceLocation = [request valueForKey:@"_deviceLocation"];
-    if (deviceLocation) {
-        NSNumber *lat = [deviceLocation valueForKey:@"_lat"];
-        NSNumber *lng = [deviceLocation valueForKey:@"_lng"];
-        NSLog(@"[MapsX] deviceLocation: lat=%@, lng=%@", lat, lng);
-    }
-    
-    GEOLocation *location = [request valueForKey:@"_location"];
-    if (location) {
-        NSLog(@"[MapsX] location: %@", [location description]);
-        
-        GEOLatLng *locLatLng = [location valueForKey:@"_latLng"];
-        if (locLatLng) {
-            NSNumber *lat = [locLatLng valueForKey:@"_lat"];
-            NSNumber *lng = [locLatLng valueForKey:@"_lng"];
-            NSLog(@"[MapsX] location latLng: lat=%@, lng=%@", lat, lng);
-        }
-        
-        NSLog(@"[MapsX] location timestamp: %f", [[location valueForKey:@"_timestamp"] doubleValue]);
-        NSLog(@"[MapsX] location horizontalAccuracy: %f", [[location valueForKey:@"_horizontalAccuracy"] doubleValue]);
-        NSLog(@"[MapsX] location verticalAccuracy: %f", [[location valueForKey:@"_verticalAccuracy"] doubleValue]);
-        NSLog(@"[MapsX] location altitude: %d", [[location valueForKey:@"_altitude"] intValue]);
-        NSLog(@"[MapsX] location course: %f", [[location valueForKey:@"_course"] doubleValue]);
-        NSLog(@"[MapsX] location heading: %f", [[location valueForKey:@"_heading"] doubleValue]);
-        NSLog(@"[MapsX] location speed: %f", [[location valueForKey:@"_speed"] doubleValue]);
-    }
-    
-    // Log arrays
-    NSArray *filterByBusinessCategorys = [request valueForKey:@"_filterByBusinessCategorys"];
-    if (filterByBusinessCategorys) {
-        NSLog(@"[MapsX] filterByBusinessCategorys: %@", filterByBusinessCategorys);
-    }
-    
-    NSArray *searchSubstrings = [request valueForKey:@"_searchSubstrings"];
-    if (searchSubstrings) {
-        NSLog(@"[MapsX] searchSubstrings: %@", searchSubstrings);
-    }
-    
-    NSArray *serviceTags = [request valueForKey:@"_serviceTags"];
-    if (serviceTags) {
-        NSLog(@"[MapsX] serviceTags: %@", serviceTags);
-    }
-    
-    // Log data objects
-    NSData *zilchPoints = [request valueForKey:@"_zilchPoints"];
-    if (zilchPoints) {
-        NSLog(@"[MapsX] zilchPoints length: %lu", (unsigned long)[zilchPoints length]);
-    }
-    
-    // Try to log struct flags
-    NSValue *hasValue = [request valueForKey:@"_has"];
-    if (hasValue) {
-        unsigned int hasFlags = 0;
-        if ([hasValue isKindOfClass:[NSNumber class]]) {
-            hasFlags = [(NSNumber *)hasValue unsignedIntValue];
-        } else {
-            [hasValue getValue:&hasFlags];
-        }
-        NSLog(@"[MapsX] has flags: %u", hasFlags);
-    }
-    
-    NSLog(@"[MapsX] ----- End GEOPlaceSearchRequest Details -----");
-}
-
+#import "GEOQueryToLatLng.h"
+#import <objc/message.h>
 
 NSURL *addAccessKeyToURL(NSURL *originalURL) {
     if (!originalURL) return originalURL;
     
     NSString *urlString = [originalURL absoluteString];
-    NSString *token = [[TokenManager sharedManager] currentAccessKey];
+    NSString *token = [[GEOTokenManager sharedManager] currentAccessKey];
     
     // Parse URL parts
     NSString *baseURLString;
@@ -203,7 +72,7 @@ NSURL *addAccessKeyToURL(NSURL *originalURL) {
     id originalURL = %orig;
     NSLog(@"Original Manifest URL: %@", originalURL);
 
-    NSString *newURLString = @"https://gspe21-ssl.ls.apple.com/config/prod-resources-hidpi-20";
+    NSString *newURLString = @"https://gsp21.ls.apple.com/config/prod-resources-hidpi-20";
 
     // Return the new URL
     return newURLString;
@@ -241,13 +110,16 @@ NSURL *addAccessKeyToURL(NSURL *originalURL) {
 		newHost = @"gspe19.ls.apple.com";
 		modifyHost = true;
 	} else if ([host isEqualToString:@"gspa21.ls.apple.com"]) {
-		newHost = @"gspe21-ssl.ls.apple.com";
+		newHost = @"gsp21.ls.apple.com";
 		modifyHost = true;
 	} else if ([host isEqualToString:@"gsp1.apple.com"]) {
 		newHost = @"gsp1.apple.com";
 		modifyHost = true;
-	} else if ([host isEqualToString:@"gsp10-ssl.apple.com"]) {
-		newHost = @"gsp64-ssl.ls.apple.com";
+	} else if ([host isEqualToString:@"gs-loc.apple.com"]) {
+		newHost = @"gsp10-ssl.apple.com";
+		modifyHost = true;
+	} else if ([host isEqualToString:@"gspe21-ssl.ls.apple.com"]) {
+		newHost = @"gsp21.ls.apple.com";
 		modifyHost = true;
 	}
 
@@ -264,13 +136,13 @@ NSURL *addAccessKeyToURL(NSURL *originalURL) {
 	[newURLString appendFormat:@"%@://%@", scheme, newHost];
 
 	// now for the extra params
-	if (path && ![path isEqualToString:@""]) {
-        if ([newHost isEqualToString:@"gsp64-ssl.ls.apple.com"] && [path isEqualToString:@"/use"]) {
-            [newURLString appendString:@"/a/v2/use"];
-        } else {
+	// if (path && ![path isEqualToString:@""]) {
+    //     if ([newHost isEqualToString:@"gsp64-ssl.ls.apple.com"] && [path isEqualToString:@"/use"]) {
+    //         [newURLString appendString:@"/a/v2/use"];
+    //     } else {
             [newURLString appendString:path];
-        }
-	}
+    //     }
+	// }
 
 	if (query && ![query isEqualToString:@""]) {
 		[newURLString appendFormat:@"?%@", query];
@@ -429,7 +301,7 @@ NSURL *addAccessKeyToURL(NSURL *originalURL) {
                             if (currentMapRegion) { 
                                 NSLog(@"[MapsX] generating new data");
                                 GEOWaypointID *waypointID = [GEOWaypointID alloc];
-                                NSError *error = [QueryToLatLng getQueryToLatLng:search region:currentMapRegion out:waypointID];
+                                NSError *error = [GEOQueryToLatLng getQueryToLatLng:search region:currentMapRegion out:waypointID];
                                 if (!error) {
                                     // nice
                                     [waypointID writeTo:waypointId]; // crimes

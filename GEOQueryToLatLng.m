@@ -5,8 +5,8 @@
 #include <Foundation/NSDictionary.h>
 #include <Foundation/NSString.h>
 #import <CoreFoundation/CoreFoundation.h>
-#import "TokenManager.h"
-#import "QueryToLatLng.h"
+#import "GEOTokenManager.h"
+#import "GEOQueryToLatLng.h"
 #import "GeoHeaders.h"
 
 // Custom URL decoding function, i duplicated this because im tired
@@ -72,14 +72,14 @@ NSString *customURLEncode(NSString *string) {
     return result;
 }
 
-@interface QueryToLatLng ()
+@interface GEOQueryToLatLng ()
 @end
 
-@implementation QueryToLatLng
+@implementation GEOQueryToLatLng
 
 +(NSError*)getQueryToLatLng:(NSString*)query region:(GEOMapRegion*)currentMapRegion out:(GEOWaypointID*)output{
     NSString *queryURL = [NSString stringWithFormat:@"https://api.apple-mapkit.com/v1/searchAutocomplete?q=%@&searchRegion=%f,%f,%f,%f&mkjsVersion=5.78.158", customURLEncode(query), currentMapRegion.northLat, currentMapRegion.eastLng, currentMapRegion.southLat, currentMapRegion.westLng];
-    NSString *token = [[TokenManager sharedManager] currentAccessToken];
+    NSString *token = [[GEOTokenManager sharedManager] currentAccessToken];
 
     // make request
     NSURL *url = [NSURL URLWithString:queryURL];
