@@ -78,26 +78,26 @@ NSString *customURLEncode(NSString *string) {
 @implementation GEOQueryToLatLng
 
 +(NSError*)getQueryToLatLng:(NSString*)query region:(GEOMapRegion*)currentMapRegion out:(GEOWaypointID*)output{
-    NSString *queryURL = [NSString stringWithFormat:@"https://api.apple-mapkit.com/v1/searchAutocomplete?q=%@&searchRegion=%f,%f,%f,%f&mkjsVersion=5.78.158", customURLEncode(query), currentMapRegion.northLat, currentMapRegion.eastLng, currentMapRegion.southLat, currentMapRegion.westLng];
+    NSString *queryURL = [NSString stringWithFormat:@"https://api.apple-mapkit.com/v1/search?q=%@&searchRegion=%f,%f,%f,%f", customURLEncode(query), currentMapRegion.northLat, currentMapRegion.eastLng, currentMapRegion.southLat, currentMapRegion.westLng];
     NSString *token = [[GEOTokenManager sharedManager] currentAccessToken];
-
+    
     // make request
     NSURL *url = [NSURL URLWithString:queryURL];
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url 
-                                     cachePolicy:NSURLRequestUseProtocolCachePolicy 
-                                 timeoutInterval:60.0];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url
+                                                           cachePolicy:NSURLRequestUseProtocolCachePolicy
+                                                       timeoutInterval:60.0];
     
     [request setHTTPMethod:@"GET"];
     [request addValue:[NSString stringWithFormat:@"Bearer %@", token] forHTTPHeaderField:@"Authorization"];
     
     NSLog(@"[MapsX] URL is %@", queryURL);
-
-
+    
+    
     NSURLResponse *response = nil;
     NSError *error = nil;
     NSData *responseData = [NSURLConnection sendSynchronousRequest:request // its a blocking thread, but theres not much i can do.
-                                         returningResponse:&response 
-                                                     error:&error];
+                                                 returningResponse:&response
+                                                             error:&error];
     
     if (error) {
         NSLog(@"[MapsX] Request failed to get more info on directions query: %@", [error localizedDescription]);
@@ -106,55 +106,48 @@ NSString *customURLEncode(NSString *string) {
     
     error = nil;
     id object = [NSJSONSerialization
-                      JSONObjectWithData:responseData
-                      options:0
-                      error:&error];
-
-    if(error) { 
+                 JSONObjectWithData:responseData
+                 options:0
+                 error:&error];
+    
+    if(error) {
         NSLog(@"[MapsX] Failed to decode location query JSON: %@", [error localizedDescription]);
-        return error; 
+        return error;
     }
-
+    
     if([object isKindOfClass:[NSDictionary class]])
-    {  
+    {
         NSDictionary *data = object;
-
+        
         if ([data[@"results"] isKindOfClass:[NSArray class]] && ([data[@"results"] count] > 0)) {
-            NSArray *mapResults = data[@"results"];
-            for (int i = 0; mapResults.count > i; i++) {
-                if (mapResults[i][@"type"] && ![mapResults[i][@"type"] isEqualToString:@"QUERY"]) {
-                    // hopefully a valid place. i hope
-                    NSDictionary *mapPlace = mapResults[i];
-                    if (mapPlace[@"muid"]) { output.muid = [mapPlace[@"muid"] longLongValue]; }
-                    
-                    // Lat long
-                    if ([mapPlace[@"location"] isKindOfClass:[NSDictionary class]]) {
-                        NSDictionary *locationInfo = mapPlace[@"location"];
-                        GEOLatLng *locationHint = [GEOLatLng alloc];
-                        [locationHint setValue:locationInfo[@"lat"] forKey:@"_lat"];
-                        [locationHint setValue:locationInfo[@"lng"] forKey:@"_lng"];
-                        output.locationHint = locationHint;
-                    }
-
-                    // address lines
-                    if ([mapPlace[@"displayLines"] isKindOfClass:[NSArray class]]) { // not exact but close enough
-                        output.formattedAddressLineHints = mapPlace[@"displayLines"];
-                    }
-
-                    // structured address
-                    output.addressHint = [GEOStructuredAddress alloc];
-                    if (mapPlace[@"administrativeArea"]) { output.addressHint.administrativeArea = mapPlace[@"administrativeArea"]; }
-                    if (mapPlace[@"subAdministrativeArea"]) { output.addressHint.subAdministrativeArea = mapPlace[@"subAdministrativeArea"]; }
-                    if (mapPlace[@"locality"]) { output.addressHint.locality = mapPlace[@"locality"]; }
-                    if (mapPlace[@"postCode"]) { output.addressHint.postCode = mapPlace[@"postCode"]; }
-                    if (mapPlace[@"thoroughfare"]) { output.addressHint.thoroughfare = mapPlace[@"thoroughfare"]; }
-                    if (mapPlace[@"subThoroughfare"]) { output.addressHint.subThoroughfare = mapPlace[@"subThoroughfare"]; }
-                    if (mapPlace[@"fullThoroughfare"]) { output.addressHint.fullThoroughfare = mapPlace[@"fullThoroughfare"]; }
-
-                    return nil;
+            NSDictionary *mapPlace = data[@"results"][0];
+                // hopefully a valid place. i hope
+                
+                // Lat long
+                if ([mapPlace[@"center"] isKindOfClass:[NSDictionary class]]) {
+                    NSDictionary *locationInfo = mapPlace[@"center"];
+                    GEOLatLng *locationHint = [GEOLatLng alloc];
+                    [locationHint setValue:locationInfo[@"lat"] forKey:@"_lat"];
+                    [locationHint setValue:locationInfo[@"lng"] forKey:@"_lng"];
+                    output.locationHint = locationHint;
                 }
-            }
-            return [NSError errorWithDomain:@"maps place no exist :(" code:1 userInfo:nil];
+                
+                // address lines
+                if ([mapPlace[@"formattedAddressLines"] isKindOfClass:[NSArray class]]) { // not exact but close enough
+                    output.formattedAddressLineHints = mapPlace[@"formattedAddressLines"];
+                }
+                
+                // structured address
+                output.addressHint = [GEOStructuredAddress alloc];
+                if (mapPlace[@"administrativeArea"]) { output.addressHint.administrativeArea = mapPlace[@"administrativeArea"]; }
+                if (mapPlace[@"subAdministrativeArea"]) { output.addressHint.subAdministrativeArea = mapPlace[@"subAdministrativeArea"]; }
+                if (mapPlace[@"locality"]) { output.addressHint.locality = mapPlace[@"locality"]; }
+                if (mapPlace[@"postCode"]) { output.addressHint.postCode = mapPlace[@"postCode"]; }
+                if (mapPlace[@"thoroughfare"]) { output.addressHint.thoroughfare = mapPlace[@"thoroughfare"]; }
+                if (mapPlace[@"subThoroughfare"]) { output.addressHint.subThoroughfare = mapPlace[@"subThoroughfare"]; }
+                if (mapPlace[@"fullThoroughfare"]) { output.addressHint.fullThoroughfare = mapPlace[@"fullThoroughfare"]; }
+                
+                return nil;
         } else {
             return [NSError errorWithDomain:@"maps result either does not exist, or is blank" code:1 userInfo:nil];
         }

@@ -1,386 +1,234 @@
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
-#import "GEOTokenManager.h"
 #import <execinfo.h>
-#import "Protobufs.h"
-#import "GeoHeaders.h"
-#import "GEOQueryToLatLng.h"
 #import <objc/message.h>
+#include <stdint.h>
 
-NSURL *addAccessKeyToURL(NSURL *originalURL) {
-    if (!originalURL) return originalURL;
-    
-    NSString *urlString = [originalURL absoluteString];
-    NSString *token = [[GEOTokenManager sharedManager] currentAccessKey];
-    
-    // Parse URL parts
-    NSString *baseURLString;
-    NSString *queryString;
-    
-    // Split URL into base and query components
-    NSRange queryRange = [urlString rangeOfString:@"?"];
-    if (queryRange.location == NSNotFound) {
-        baseURLString = urlString;
-        queryString = @"";
-    } else {
-        baseURLString = [urlString substringToIndex:queryRange.location];
-        queryString = [urlString substringFromIndex:queryRange.location + 1];
-    }
-    
-    // Parse query parameters
-    NSMutableDictionary *queryParams = [NSMutableDictionary dictionary];
-    NSArray *queryPairs = [queryString componentsSeparatedByString:@"&"];
-    
-    for (NSString *pair in queryPairs) {
-        if ([pair length] == 0) continue;
-        
-        NSArray *keyValue = [pair componentsSeparatedByString:@"="];
-        if ([keyValue count] < 2) continue;
-        
-        NSString *key = customURLDecode(keyValue[0]);
-        NSString *value = customURLDecode(keyValue[1]);
-        
-        queryParams[key] = value;
-    }
-    
-    // Add accessKey parameter
-    queryParams[@"accessKey"] = token;
-    
-    // Rebuild query string
-    NSMutableArray *newQueryPairs = [NSMutableArray array];
-    for (NSString *key in queryParams) {
-        NSString *value = queryParams[key];
-        
-        NSString *escapedKey = customURLEncode(key);
-        NSString *escapedValue = customURLEncode(value);
-        
-        [newQueryPairs addObject:[NSString stringWithFormat:@"%@=%@", escapedKey, escapedValue]];
-    }
-    
-    NSString *newQueryString = [newQueryPairs componentsJoinedByString:@"&"];
-    NSString *newURLString = baseURLString;
-    if ([newQueryString length] > 0) {
-        newURLString = [baseURLString stringByAppendingFormat:@"?%@", newQueryString];
-    }
-    
-    return [NSURL URLWithString:newURLString];
-}
+typedef struct GEOTileKey {
+	unsigned z : 6;
+	unsigned x : 26;
+	unsigned y : 26;
+	unsigned type : 6;
+	unsigned pixelSize : 8;
+	unsigned textScale : 8;
+	unsigned provider : 8;
+	unsigned expires : 1;
+	unsigned reserved1 : 7;
+	unsigned char reserved2[4];
+} GEOTileKey;
 
-%hook GEOResourceManifestServerLocalProxy
+// %hook PBCodable
 
-- (id)_manifestURL {
-    id originalURL = %orig;
-    NSLog(@"Original Manifest URL: %@", originalURL);
-
-    NSString *newURLString = @"https://gsp21.ls.apple.com/config/prod-resources-hidpi-20";
-
-    // Return the new URL
-    return newURLString;
-}
-
-%end
-
-%hook NSURLRequest
-
-- (instancetype)initWithURL:(NSURL *)URL cachePolicy:(NSURLRequestCachePolicy)cachePolicy timeoutInterval:(NSTimeInterval)timeoutInterval {
-    //  URL Rewrites
-	if (!URL) {
-		NSLog(@"[MapsX] Bad URL");
-		return %orig;
-	}
+// -(id)initWithData:(NSData*)data {
+//         void *callstack[128];
+// 	int frames = backtrace(callstack, 128);
+// 	char **symbols = backtrace_symbols(callstack, frames);
+// 	NSMutableString *callstackString = [NSMutableString stringWithFormat:@"[MapsX] Callstack for protocol buffer"];
+// 	for (int i = 0; i < frames; i++) {
+// 		[callstackString appendFormat:@"%s\n", symbols[i]];
+// 	}
+// 	NSLog(@"%@", callstackString);
 	
-	NSString *host = [URL host];
-	if (!host) {
-		NSLog(@"[MapsX] Bad URL: %@", [URL absoluteString]);
-		return %orig;
-	}
+// 	free(symbols);
+//     return %orig;
+// }
 
-	NSString *newHost = nil;
-	BOOL modifyHost = false;
-	if ([host isEqualToString:@"gspa35-ssl.ls.apple.com"]) {
-		newHost = @"gspe35-ssl.ls.apple.com";
-		modifyHost = true;
-	} else if ([host isEqualToString:@"gspa11.ls.apple.com"]) {
-		newHost = @"gspe11-ssl.ls.apple.com";
-		modifyHost = true;
-	} else if ([host isEqualToString:@"gspa12.ls.apple.com"]) {
-		newHost = @"gspe12-ssl.ls.apple.com";
-		modifyHost = true;
-	} else if ([host isEqualToString:@"gspa19.ls.apple.com"]) {
-		newHost = @"gspe19.ls.apple.com";
-		modifyHost = true;
-	} else if ([host isEqualToString:@"gspa21.ls.apple.com"]) {
-		newHost = @"gsp21.ls.apple.com";
-		modifyHost = true;
-	} else if ([host isEqualToString:@"gsp1.apple.com"]) {
-		newHost = @"gsp1.apple.com";
-		modifyHost = true;
-	} else if ([host isEqualToString:@"gs-loc.apple.com"]) {
-		newHost = @"gsp10-ssl.apple.com";
-		modifyHost = true;
-	} else if ([host isEqualToString:@"gspe21-ssl.ls.apple.com"]) {
-		newHost = @"gsp21.ls.apple.com";
-		modifyHost = true;
-	}
 
-	if (!modifyHost) {
-		return %orig;
-	}
+// %end
+// %hook GEOResources
+// -(void)addTileSet:(id)tileSet
+// {
+//     id betterTileSet = tileSet;
+//     [betterTileSet setValue:@"http://google.com/lol/" forKey:@"_baseURL"];
+//     NSLog(@"tileset baseurl -> %@", tileSet);
+    
+//     return %orig;
+// }
+// %end
 
-	// and now for the fun bit, recreating!
-	NSString *scheme = [URL scheme];
-	NSString *path = [URL path];
-	NSString *query = [URL query];
 
-	NSMutableString *newURLString = [NSMutableString string];
-	[newURLString appendFormat:@"%@://%@", scheme, newHost];
+// %hook GEOResourceManifestDownload 
+// -(void)setResources:(id)resources
+// {
+//     NSLog(@"resourcers -> %@", resources);
+//     %orig;
+// }
 
-	// now for the extra params
-	// if (path && ![path isEqualToString:@""]) {
-    //     if ([newHost isEqualToString:@"gsp64-ssl.ls.apple.com"] && [path isEqualToString:@"/use"]) {
-    //         [newURLString appendString:@"/a/v2/use"];
-    //     } else {
-            [newURLString appendString:path];
-    //     }
-	// }
+// -(id)resources {
+//     id orig = %orig;
+//     NSLog(@"resources 2 -> %@", orig);
+//     return orig;
+// }
+// %end
 
-	if (query && ![query isEqualToString:@""]) {
-		[newURLString appendFormat:@"?%@", query];
-	}
 
-    NSURL *newURL = [NSURL URLWithString:newURLString];
-    return %orig(newURL, cachePolicy, timeoutInterval);
+
+
+%hook GEOResourceLoader
+
+-(id)initWithTileGroupIdentifier:(int)groupIdentifier uniqueIdentifier:(id)uniqueIdentifier targetDirectory:(id)targetDirectory baseURLString:(NSString*)baseURLString isFirstLoad:(BOOL)isFirstLoad {
+    NSLog(@"[MapsX] Resource Loader URL: %@", baseURLString);
+    return %orig;
 }
 
 %end
 
-%hook NSURLConnection
+// %hook GEOResourceManifestManager
 
-- (instancetype)initWithRequest:(NSURLRequest *)request delegate:(id)delegate startImmediately:(BOOL)startImmediately {
-    NSURL *originalURL = [request URL];
-    if (!(
-         ([[originalURL host] isEqualToString:@"gspe11-ssl.ls.apple.com"]) || 
-         ([[originalURL host] isEqualToString:@"gspe11.ls.apple.com"]) || 
-         ([[originalURL host] isEqualToString:@"gspe19.ls.apple.com"]) || 
-         ([[originalURL host] isEqualToString:@"gspe12-ssl.ls.apple.com"]))) {
-        return %orig(request, delegate, startImmediately);
-    }
+// -(id)baseURLStringForTileKey:(GEOTileKey*)tileKey {
+//     id orig = %orig;
+//     NSLog(@"ManifestManager: %@", orig);
+//     return orig;
+// }
 
-    // NSString *urlString = [originalURL absoluteString];
-    
-    // NSLog(@"Original URL (initWithRequest:delegate:startImmediately:): %@", urlString);
-    
-    // Use the helper function to add the accessKey parameter
-    NSURL *newURL = addAccessKeyToURL(originalURL);
-    
-    // Create a mutable copy of the request and set the new URL
-    NSMutableURLRequest *modifiedRequest = [request mutableCopy];
-    [modifiedRequest setURL:newURL];
-    
-    // NSLog(@"Modified URL (initWithRequest:delegate:startImmediately:): %@", [newURL absoluteString]);
-    
-    return %orig(modifiedRequest, delegate, startImmediately);
+// %end
+
+%hook GEONameInfo 
+-(NSString*)shield {
+    id orig = %orig;
+    NSLog(@"[MapsX] shield = %@", orig);
+    return orig;
 }
-
 %end
 
-%hook GEODirectionsRequest
 
--(void)writeTo:(id)writer {
-    // void *callstack[128];
-    // int frames = backtrace(callstack, 128);
-    // char **symbols = backtrace_symbols(callstack, frames);
-    // NSString *imlazy = @"a";
-    // NSMutableString *callstackString = [NSMutableString stringWithFormat:@"[MapsX] Callstack for modifying %@:\n", imlazy];
-    // for (int i = 0; i < frames; i++) {
-    //     [callstackString appendFormat:@"%s\n", symbols[i]];
-    // }
-    // NSLog(@"%@", callstackString);
-    
-    // free(symbols);
-    NSLog(@"[MapsX] GEODirectionsRequest.writeTo called!");
-    if ([writer isKindOfClass:[PBDataWriter class]]) {      
-        NSValue *hasValue = [self valueForKey:@"_has"];
-        unsigned int hasFlags = 0;
-        
-        // i have no clue if this works
-        if ([hasValue isKindOfClass:[NSNumber class]]) {
-            hasFlags = [(NSNumber *)hasValue unsignedIntValue];
-        } else {
-            [hasValue getValue:&hasFlags];
-        }
-        
-        NSLog(@"[MapsX] Has flags: %u", hasFlags);
-
-        // route attributes  
-        PBCodable *routeAttributes = [self valueForKey:@"_routeAttributes"];
-        if (routeAttributes != nil) {
-            PBDataWriter *dataWriter = [[PBDataWriter alloc] init];
-            [routeAttributes writeTo:dataWriter];
-            [writer writeData:[dataWriter data] forTag:1];
-        }
-
-        if (hasFlags & 0x2) {  // maxRouteCount flag
-            NSNumber *maxRouteCount = [self valueForKey:@"_maxRouteCount"];
-            if (maxRouteCount != nil) {
-                [writer writeUint32:[maxRouteCount unsignedIntValue] forTag:3]; // mainTransportTypeMaxRouteCount on iOS 11
-            }
-        }
-        
-        PBCodable *currentUserLocation = [self valueForKey:@"_currentUserLocation"];
-        if (currentUserLocation != nil) {
-            PBDataWriter *dataWriter = [[PBDataWriter alloc] init];
-            [currentUserLocation writeTo:dataWriter];
-            [writer writeData:[dataWriter data] forTag:4];
-        }
-
-        GEOMapRegion *currentMapRegion = [self valueForKey:@"_currentMapRegion"];
-        if (currentMapRegion != nil) {
-            PBDataWriter *dataWriter = [[PBDataWriter alloc] init];
-            [currentMapRegion writeTo:dataWriter];
-            [writer writeData:[dataWriter data] forTag:5];
-        }
-        
-
-        NSData* (^writeWaypointAsTyped)(GEOWaypoint *) = ^NSData* (GEOWaypoint *waypoint) {
-            PBDataWriter *waypointWriter = [[PBDataWriter alloc] init];
-            // I'm not sure of all the types but,
-            // 2 = place search result?
-            // 4 = Latlong/gps loc?
-
-            // In actual source it's
-            // 2 = Waypoint ID
-            // 3 = Waypoint Place
-            // 4 = Waypoint Location
-            GEOPlaceSearchRequest *placeRequest = [waypoint valueForKey:@"_placeSearchRequest"];
-            GEOPlaceSearchRequest *location = [waypoint valueForKey:@"_location"];
-            if (placeRequest) { // type 2, GEOWaypointID, https://github.com/nst/iOS-Runtime-Headers/blob/f53e3d01aceb4aab6ec2c37338d2df992d917536/PrivateFrameworks/GeoServices.framework/GEOWaypointID.h
-                // logGEOPlaceSearchRequestDetails(placeRequest);
-                [waypointWriter writeInt32:2 forTag:1];
-                PBDataWriter *waypointId = [[PBDataWriter alloc] init];
-                // [waypointId writeUint64:11026153924627430591LLU forTag:1]; // I think this is some sort of ID for the location? i dunno.
-                // [waypointId writeUint64:7618 forTag:2]; // ResultProviderId
-                NSString *search = [placeRequest valueForKey:@"_search"]; // I am not happy about this being the only data for some requests.
-                GEOLocation *placeLocation = [placeRequest valueForKey:@"_location"];
-                if (placeLocation) {
-                    GEOLatLng *latLng = [placeLocation valueForKey:@"_latLng"];
-                    if (latLng) {
-                        NSNumber *lat = [latLng valueForKey:@"_lat"];
-                        NSNumber *lng = [latLng valueForKey:@"_lng"];
-                        if (lat && lng) {
-                            PBDataWriter *latlong = [[PBDataWriter alloc] init];
-                            [latlong writeDouble:[lat doubleValue] forTag:1];
-                            [latlong writeDouble:[lng doubleValue] forTag:2];
-                            [waypointId writeData:[latlong data] forTag:3];
-                        }
-                    }
-                    GEOAddress *address = [placeRequest valueForKey:@"_address"]; // if it has it.
-                    if (address) {
-                        GEOStructuredAddress *stAddress = [placeRequest valueForKey:@"_structuredAddress"];
-                        if (stAddress) {
-                            PBDataWriter *stAddressP = [[PBDataWriter alloc] init];
-                            [stAddress writeTo:stAddressP];
-                            [waypointId writeData:[stAddressP data] forTag:4];
-                        }
-                    }
-                } else {
-                    GEOAddress *address = [placeRequest valueForKey:@"_address"];
-                    if (address) {
-                        NSLog(@"[MapsX] has address");
-                        GEOStructuredAddress *stAddress = [placeRequest valueForKey:@"_structuredAddress"];
-                        if (stAddress) {
-                            NSLog(@"[MapsX] writing structured address data ");
-                            PBDataWriter *stAddressP = [[PBDataWriter alloc] init];
-                            [stAddress writeTo:stAddressP];
-                            [waypointId writeData:[stAddressP data] forTag:4];
-                        }
-                    } else {
-                        // welcome to nightmare mode. from here, we do not have enough information to complete the request successfully. We need extra data. Which means a web request! 2G users must be screaming rn.
-                        if (search) {
-                            NSLog(@"[MapsX] search request %@", search);
-                            if (currentMapRegion) { 
-                                NSLog(@"[MapsX] generating new data");
-                                GEOWaypointID *waypointID = [GEOWaypointID alloc];
-                                NSError *error = [GEOQueryToLatLng getQueryToLatLng:search region:currentMapRegion out:waypointID];
-                                if (!error) {
-                                    // nice
-                                    [waypointID writeTo:waypointId]; // crimes
-                                } else {
-                                    NSLog(@"[MapsX] Failed to get more info for location: %@", error);
-                                }
-                            } else {
-                                NSLog(@"[MapsX] Uhhhh we don't have currentMapRegion, thats fun!");
-                            }
-                            
-
-                            // [waypointId writeString:search forTag:5]; 
-                            // [waypointId writeString:search forTag:6]; // mapRegion, or smth like that
-                        } else {
-                            NSLog(@"[MapsX] no search request, uhhhh what? bruh.");
-                        }
-                    }
-                }
-                
-
-                // [waypointId writeString:@"Los Angeles" forTag:5]; // placeName
-                
-                
-                [waypointId writeInt32:16 forTag:7]; // placeTypeHint
-                [waypointWriter writeData:[waypointId data] forTag:2];
-            } else if (location) {
-                [waypointWriter writeInt32:4 forTag:1];// types
-        
-                // // Create a properly nested message for tag4 inside tag22
-                PBDataWriter *locationP = [[PBDataWriter alloc] init];
-                [location writeTo:locationP];
-
-                PBDataWriter *tag22_4 = [[PBDataWriter alloc] init];
-                [tag22_4 writeData:[locationP data] forTag:1];
-                
-                [waypointWriter writeData:[tag22_4 data] forTag:4];
-                [waypointWriter writeInt32:1 forTag:5];
-            }
-            return [waypointWriter data];
-        };
-        
-        NSArray *waypoints = [self valueForKey:@"_waypoints"];
-        NSFastEnumerationState state = {0};
-        __unsafe_unretained id objects[16];
-        NSUInteger count = [waypoints countByEnumeratingWithState:&state objects:objects count:16];
-        if (count != 0) {
-            do {
-                for (NSUInteger i = 0; i < count; i++) {
-                    id waypoint = state.itemsPtr[i];
-                    NSData *waypointData = writeWaypointAsTyped(waypoint);
-                    [writer writeData:waypointData forTag:22]; // waypointTyped
-                }
-                count = [waypoints countByEnumeratingWithState:&state objects:objects count:16];
-            } while (count != 0);
-        } 
-
-
-        NSArray *serviceTags = [self valueForKey:@"_serviceTags"];
-        NSFastEnumerationState serviceState = {0};
-        __unsafe_unretained id serviceObjects[16];
-        count = [serviceTags countByEnumeratingWithState:&serviceState objects:serviceObjects count:16];
-        if (count != 0) {
-            do {
-                for (NSUInteger i = 0; i < count; i++) {
-                    id serviceTag = serviceState.itemsPtr[i];
-                    PBDataWriter *serviceWriter = [[PBDataWriter alloc] init];
-                    [serviceTag writeTo:serviceWriter];
-                    [writer writeData:[serviceWriter data] forTag:100];
-                }
-                count = [serviceTags countByEnumeratingWithState:&serviceState objects:serviceObjects count:16];
-            } while (count != 0);
-        }
-        
-    } else {
-        return %orig;
-    }
+%hook GEOVFeature
+-(id)shieldLabelTypes {
+    id orig = %orig;
+    NSLog(@"[MapsX] shieldTypes = %@", orig);
+    return orig;
 }
-
 %end
+
+// void __cdecl -[GEOResourceManifestServerLocalProxy connectionDidFinishLoading:](
+//         GEOResourceManifestServerLocalProxy *self,
+//         SEL a2,
+//         id a3)
+// {
+//   GEOResources *v5; // r0
+//   GEOResources *v6; // r10
+//   id v7; // r0
+//   NSError *v8; // r5
+//   int v9; // r0
+//   NSError *v10; // r5
+//   int v11; // r2
+//   char **v12; // r0
+//   GEODownloadMetadata *v13; // r0
+//   GEODownloadMetadata *v14; // r5
+//   NSString *v15; // r0
+//   GEODownloadMetadata *v16; // r6
+//   NSDate *v17; // r0
+//   id v18; // r0
+//   int v19; // r1
+//   GEODownloadMetadata *v20; // r0
+//   int v21; // r0
+//   id v22; // r5
+//   int v23; // r0
+//   GEOResources *v24; // r0
+//   GEOResources *v25; // r0
+//   id v26; // r2
+
+//   v5 = +[GEOResources alloc]();
+//   v6 = -[GEOResources initWithData:](v5, self->_responseData);
+//   if ( !(unsigned __int8)_isManifestValid(v6) )
+//   {
+//     v7 = -[GEOResourceManifestServerLocalProxy _manifestURL](self);
+//     NSLog(
+//       &cfstr_SDErrorParsing.isa,
+//       "/SourceCache/GeoServices/GeoServices-457.9/GEOResourceManifestServerLocalProxy.m",
+//       1020,
+//       v7);
+//     v8 = +[NSError alloc]();
+//     v9 = GEOErrorDomain();
+//     v10 = -[NSError initWithDomain:code:userInfo:](v8, v9, -602, 0);
+//     -[GEOResourceManifestServerLocalProxy connection:didFailWithError:](self, a3, v10);
+//     -[NSError release](v10);
+//     -[GEOResources release](v6);
+//     v12 = &selRef__cleanupConnection;
+// LABEL_9:
+//     objc_msgSend_shim(self, *v12, v11);
+//     return;
+//   }
+//   self->_manifestRetryCount = 0;
+//   v13 = +[GEODownloadMetadata alloc]();
+//   v14 = -[GEODownloadMetadata init](v13);
+//   -[GEOResourceManifestDownload setMetadata:](self->_resourceManifest, v14);
+//   -[GEODownloadMetadata release](v14);
+//   -[NSLock lock](self->_authTokenLock);
+//   -[NSString release](self->_authToken);
+//   v15 = -[GEOResources authToken](v6);
+//   self->_authToken = -[NSString retain](v15);
+//   -[NSLock unlock](self->_authTokenLock);
+//   -[GEOResourceManifestDownload setResources:](self->_resourceManifest, v6);
+//   -[GEOResources release](v6);
+//   v16 = -[GEOResourceManifestDownload metadata](self->_resourceManifest);
+//   v17 = +[NSDate date]();
+//   v18 = -[NSDate timeIntervalSince1970](v17);
+//   -[GEODownloadMetadata setTimestamp:](v16, v18, v19);
+//   v20 = -[GEOResourceManifestDownload metadata](self->_resourceManifest);
+//   -[GEODownloadMetadata setEtag:](v20, self->_responseETag);
+//   -[GEOResourceManifestServerLocalProxy _writeManifestToDisk:](self, self->_resourceManifest);
+//   -[GEOResourceManifestServerLocalProxy _cleanupConnection](self);
+//   if ( dword_116E80 != -1 )
+//     dispatch_once(&dword_116E80, &__block_literal_global690);
+//   v21 = GEOGetDefaultInteger(CFSTR("GEOResourceManifestUpdateTimeInterval"), dword_116E7C);
+//   -[GEOResourceManifestServerLocalProxy _scheduleUpdateTimerWithTimeInterval:](
+//     self,
+//     (double)v21);
+//   v22 = -[GEOResourceManifestServerLocalProxy _manifestURL](self);
+//   v23 = GEOGetDefault(CFSTR("GEOLastResourceManifestURL"));
+//   if ( (unsigned __int8)objc_msgSend(v22, "isEqualToString:", v23) )
+//   {
+//     v12 = &selRef__considerChangingActiveTileGroup;
+//     goto LABEL_9;
+//   }
+//   GEOSetDefault(CFSTR("GEOLastResourceManifestURL"), v22);
+//   v24 = -[GEOResourceManifestDownload resources](self->_resourceManifest);
+//   if ( -[GEOResources tileGroupsCount](v24) )
+//   {
+//     v25 = -[GEOResourceManifestDownload resources](self->_resourceManifest);
+//     v26 = -[GEOResources tileGroupAtIndex:](v25, 0);
+//     -[GEOResourceManifestServerLocalProxy _forceChangeActiveTileGroup:](self, v26);
+//   }
+// }
+
+
+
+// %hook _GEOTileDownloadOp 
+
+
+// -(void)setUrl:(NSURL*)url {
+//     return %orig(addAccessKeyToURL(url));
+// }
+// %end
+
+// %hook NSURLConnection
+
+// - (instancetype)initWithRequest:(NSURLRequest *)request delegate:(id)delegate startImmediately:(BOOL)startImmediately {
+//     NSString *urlString = [[request URL] absoluteString];
+    
+//     NSLog(@"Original URL (initWithRequest:delegate:startImmediately:): %@", urlString);
+
+//     void *callstack[128];
+// 	int frames = backtrace(callstack, 128);
+// 	char **symbols = backtrace_symbols(callstack, frames);
+// 	NSMutableString *callstackString = [NSMutableString stringWithFormat:@"[MapsX] Callstack for url"];
+// 	for (int i = 0; i < frames; i++) {
+// 		[callstackString appendFormat:@"%s\n", symbols[i]];
+// 	}
+// 	NSLog(@"%@", callstackString);
+	
+// 	free(symbols);
+//     return %orig;
+// }
+
+// %end
+
+
+
+
+// %end
+
 // %hook GEOAltitudeManifest
 // + (id)sharedManager { %log; id r = %orig; NSLog(@" = %@", r); return r; }
 // - (void)parser:(id)arg1 didStartElement:(id)arg2 namespaceURI:(id)arg3 qualifiedName:(id)arg4 attributes:(id)arg5 { %log; %orig; }

@@ -118,7 +118,7 @@
             if (newToken && newAccessToken) {
                 self.accessKey = newToken;
                 self.expiresAt = [[NSDate date] timeIntervalSince1970] + expiresIn;
-                NSLog(@"Token refreshed in background");
+                NSLog(@"[MapsX] Token refreshed in background");
             }
         }
     }];
@@ -126,7 +126,7 @@
 
 - (NSString *)requestNewMapToken:(NSInteger *)outExpiresIn outAccessToken:(NSString **)outAccessToken {
     // pods code ported to objc
-    NSString *duckDuckGoTokenURL = @"https://duckduckgo.com/local.js?get_mk_token=1";
+    NSString *duckDuckGoTokenURL = @"https://setup.icloud.com/setup/ws/1/mapkitToken";
     NSURL *url = [NSURL URLWithString:duckDuckGoTokenURL];
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url 
                                                           cachePolicy:NSURLRequestUseProtocolCachePolicy 
@@ -141,21 +141,34 @@
                                                             error:&error];
     
     if (error) {
-        NSLog(@"Connection failed: %@", [error localizedDescription]);
+        NSLog(@"[MapsX] Connection failed: %@", error);
         return nil;
     }
-
-    NSString *duckduckgotoken = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
+    
+    error = nil;
+    id jwtObject = [NSJSONSerialization JSONObjectWithData:responseData options:0 error:&error];
+    
+    if (error || ![jwtObject isKindOfClass:[NSDictionary class]]) {
+        NSLog(@"[MapsX] Failed to decode iCloud JWT token response: %@", [error localizedDescription]);
+        return nil;
+    }
+    
+    NSString *duckduckgotoken = ((NSDictionary *)jwtObject)[@"jwt"];
+    if (![duckduckgotoken isKindOfClass:[NSString class]]) {
+        NSLog(@"[MapsX] no jwt item found in the iCloud mapkitToken response");
+        return nil;
+    }
     
     // Now get the actual token we need from apple
-    NSString *appleTokenURL = @"https://cdn.apple-mapkit.com/ma/bootstrap?apiVersion=2&mkjsVersion=5.79.95&poi=1";
+    NSString *appleTokenURL = @"https://cdn.apple-mapkit.com/ma/bootstrap";
     url = [NSURL URLWithString:appleTokenURL];
     request = [NSMutableURLRequest requestWithURL:url 
                                      cachePolicy:NSURLRequestUseProtocolCachePolicy 
                                  timeoutInterval:60.0];
     
     [request setHTTPMethod:@"GET"];
-    [request addValue:[NSString stringWithFormat:@"Bearer %@", duckduckgotoken] forHTTPHeaderField:@"Authorization"];
+    [request setValue:[NSString stringWithFormat:@"Bearer %@", duckduckgotoken] forHTTPHeaderField:@"Authorization"];
+    [request setValue:@"https://www.icloud.com" forHTTPHeaderField:@"Origin"];
     
     response = nil;
     error = nil;
@@ -164,7 +177,7 @@
                                                      error:&error];
     
     if (error) {
-        NSLog(@"Connection failed: %@", [error localizedDescription]);
+        NSLog(@"[MapsX] Connection failed: %@", [error localizedDescription]);
         return nil;
     }
     
@@ -175,7 +188,7 @@
                       error:&error];
 
     if(error) { 
-        NSLog(@"Failed to decode Apple Mapkit json: %@", [error localizedDescription]);
+        NSLog(@"[MapsX] Failed to decode Apple Mapkit json: %@", [error localizedDescription]);
         return nil; 
     }
 
@@ -192,7 +205,7 @@
     }
     else
     {
-        NSLog(@"Failed to decode Apple Mapkit json: Decode was not a dictionary.");
+        NSLog(@"[MapsX] Failed to decode Apple Mapkit json: Decode was not a dictionary.");
         return nil;
     }
     

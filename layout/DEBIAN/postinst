@@ -1,0 +1,3 @@
+#!/bin/bash
+echo Restarting geod...
+killall -9 geod || true
